@@ -1,4 +1,6 @@
 pynput==1.7.6
-vgamepad==0.0.6
+vgamepad==0.1.0
 pyautogui==0.9.53
 reprint==0.6.0
+evdev==1.9.3
+natsort==8.4.0

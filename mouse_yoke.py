@@ -1,7 +1,9 @@
 from pyautogui import size, moveTo
 import pyautogui
+import evdev
+import natsort
 
-from pynput import mouse, keyboard
+from pynput import keyboard
 from reprint import output
 from threading import Thread
 import vgamepad as vg
@@ -15,98 +17,49 @@ import tkinter as tk
 with open("./config.json") as config_file:
     configs = json.load(config_file)
 
-
-logging.basicConfig(filename=f"./logs/{sys.argv[1]}", format="%(asctime)s - %(message)s")
+logging.basicConfig(filename=f"./logs/mouse_yoke.log", format="%(asctime)s - %(message)s")
 gamepad = vg.VX360Gamepad()
-screen_size = size()
 
-currentThrottleStep = 0
-pixelsToFloatX = 0.0
-pixelsToFloatY = 0.0
-global_x = 0
-global_y = 0
+joystickFloatX = 0.0
+joystickFloatY = 0.0
+throttleFloat = 0.0
+throttleX = 0
 active = False
 
-# init the variables to center of the screen
-last_x_position = 0
-last_y_position = 0
+if len(sys.argv) > 1:
+    device_number = sys.argv[1]
+else:
+    devices = [evdev.InputDevice(fn) for fn in evdev.list_devices()]
+    for device in natsort.natsorted(devices, key=lambda d: d.path):
+        print(device.path, device.name)
+    device_number = input(f'Enter the number of the event device to read from: ')
 
-
-def mouseYoke(x, y):
-    global pixelsToFloatX, pixelsToFloatY
-    global global_x, global_y
-
-    global_x = x
-    global_y = y
-    
-    if active:
-        if x >= 0 and x <= screen_size.width:
-            pixelsToFloatX = x / (screen_size.width / 2) - 1
-        if y >= 0 and y <= screen_size.height:
-            pixelsToFloatY = y / (screen_size.height / 2) - 1
-
-        gamepad.left_joystick_float(x_value_float=pixelsToFloatX, y_value_float=pixelsToFloatY)
-        gamepad.update()
-
-
-def throttle(x, y, dx, dy):
-    global currentThrottleStep
-     
-    if active:
-        if currentThrottleStep < configs['throttle_sensitivity'] and dy == 1:
-            currentThrottleStep += dy
-        if currentThrottleStep > 0 and dy == -1:
-            currentThrottleStep += dy
-        
-        stepsToFloat = currentThrottleStep / (configs['throttle_sensitivity'] / 2) - 1
-
-        gamepad.right_joystick_float(x_value_float=stepsToFloat, y_value_float=0)
-        gamepad.update()
-
+device = evdev.InputDevice('/dev/input/event'+device_number)
+print(f'Using {device.name} at {device.path}')
 
 def onKeyRelease(key):
     global active
-    global last_x_position
-    global last_y_position
+    global joystickFloatX, joystickFloatY
 
     if key == keyboard.KeyCode.from_char(configs["master_key"]):
-        if active:
-            # getting deactivated
-            last_x_position = global_x
-            last_y_position = global_y
-
         active = not active
 
-        if configs["remember_last_position"]:
-            # return to last position
-            if active: moveTo(last_x_position, last_y_position)
-            mouseYoke(last_x_position, last_y_position)
-            
-        if not configs["remember_last_position"]:
-            # return to center
-            if active: moveTo(screen_size.width / 2, screen_size.height / 2)
-            mouseYoke(screen_size.width / 2, screen_size.height / 2)
-
-    
     if key == keyboard.KeyCode.from_char(configs["center_xy_axes_key"]):
-        moveTo(screen_size.width / 2, screen_size.height / 2)
-
-        if active:
-            mouseYoke(screen_size.width / 2, screen_size.height / 2)
-        
+        joystickFloatX = 0
+        joystickFloatY = 0
 
 def userInterface():
     with output(initial_len=8, interval=0) as output_lines:
         while True:
 
-            output_lines[0] = f"+{' Status: ' + ('ACTIVE' if active else 'INACTIVE') + ' ':—^60}+"
-            output_lines[1] = f"|{'':^60}|"
-            output_lines[2] = f"|{'Axis':^20}{'Raw input':^20}{'Conversion':^20}|"
-            output_lines[3] = f"+{'':—^60}+"
-            output_lines[4] = f"|{'X':^20}{global_x:^20}{'{:.2f}'.format((pixelsToFloatX + 1) * 50) + '%':^20}|"
-            output_lines[5] = f"|{'Y':^20}{global_y:^20}{'{:.2f}'.format((pixelsToFloatY + 1) * 50) + '%':^20}|"
-            output_lines[6] = f"|{'THROTTLE':^20}{currentThrottleStep:^20}{'{:.2f}'.format((currentThrottleStep * 100 / configs['throttle_sensitivity'])) + '%':^20}|"
-            output_lines[7] = f"+{'':—^60}+"
+            output_lines[0] = f"+{' Status: ' + ('ACTIVE' if active else 'INACTIVE') + ' ':—^40}+"
+            output_lines[1] = f"|{'':^40}|"
+            output_lines[2] = f"|{'Axis':^20}{'Position':^20}|"
+            output_lines[3] = f"+{'':—^40}+"
+            output_lines[4] = f"|{'X':^20}{'{:.2f}'.format((joystickFloatX + 1) * 50) + '%':^20}|"
+            output_lines[5] = f"|{'Y':^20}{'{:.2f}'.format((joystickFloatY + 1) * 50) + '%':^20}|"
+            output_lines[6] = f"|{'THROTTLE':^20}{'{:.2f}'.format((throttleFloat + 1) * 50) + '%':^20}|"
+            output_lines[7] = f"+{'':—^40}+"
 
             time.sleep(0.05)
 
@@ -144,6 +97,26 @@ class ColorDisplayApp:
             self.master.attributes('-alpha', 0.5)
         self.master.after(100, self.update_display)
 
+def mouseLoop():
+    global joystickFloatX, joystickFloatY, throttleX, throttleFloat
+    for event in device.read_loop():
+        if event.code == evdev.ecodes.REL_WHEEL:
+            throttleX = max(-configs['throttle_segments']/2, min(throttleX + event.value, configs['throttle_segments']/2))
+            throttleFloat = throttleX / (configs['throttle_segments']/2)
+            gamepad.right_joystick_float(x_value_float=throttleFloat, y_value_float=0)
+            gamepad.update()
+        if event.type == evdev.ecodes.SYN_MT_REPORT:
+            match event.code:
+                case evdev.ecodes.REL_X:
+                    joystickFloatX = joystickFloatX + (event.value * configs['mouse_sensitivity_x'])
+                case evdev.ecodes.REL_Y:
+                    joystickFloatY = joystickFloatY + (event.value * configs['mouse_sensitivity_y'])
+
+            # ensure between 0-100%
+            joystickFloatY = max(-1, min(joystickFloatY, 1))
+            joystickFloatX = max(-1, min(joystickFloatX, 1))
+            gamepad.left_joystick_float(x_value_float=joystickFloatX, y_value_float=joystickFloatY)
+            gamepad.update()
 
 
 def runTK():
@@ -159,7 +132,7 @@ if __name__ == "__main__":
     try:
         pyautogui.FAILSAFE = False
         ui = Thread(target=userInterface)
-        ms = mouse.Listener(on_move=mouseYoke, on_scroll=throttle)
+        ms = Thread(target=mouseLoop)
         kb = keyboard.Listener(on_release=onKeyRelease)
         tl = Thread(target=runTK)
         

@@ -1,2 +1,11 @@
 /logs
-/node_modules
+.bash*
+.profile
+lib*
+pyvenv*
+activate*
+Activate*
+natsort*
+pip*
+python*
+*thon
