@@ -8,6 +8,7 @@ from reprint import output
 from threading import Thread
 import vgamepad as vg
 import logging
+import signal
 import sys
 import json
 import time
@@ -140,9 +141,9 @@ if __name__ == "__main__":
         kb.start()
         ui.start()
         tl.start()
-        ms.join()
-        kb.join()
-        tl.join()
+        # Explicitly wait for SIGINT, once caught exit
+        signal.signal(signal.SIGINT, sys.exit(0))
+        signal.pause
 
     except Exception as e:
         logging.critical("Exception occurred", exc_info=True)

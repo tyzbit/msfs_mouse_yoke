@@ -41,8 +41,8 @@ wheel position, that way, you can use it as a throttle.
 
 ## Usage
 
- 1. python3 mouse_yoke.py
- 2. Pick the device to read from.
+ 1. python3 mouse_yoke.py [event device ID - optional]
+ 2. Pick the device to read from if the ID wasn't provided.
  3. To activate the script, press the **master_key**. Default key is comma ",".
  4. If possible, disable the mouse in KDE so you can still use your cursor normally.
 
