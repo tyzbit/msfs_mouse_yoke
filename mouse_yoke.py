@@ -44,6 +44,7 @@ def onKeyRelease(key):
 
     if key == keyboard.KeyCode.from_char(configs["master_key"]):
         active = not active
+        gamepad.reset()
 
     if key == keyboard.KeyCode.from_char(configs["center_xy_axes_key"]):
         joystickFloatX = 0
@@ -101,22 +102,35 @@ class ColorDisplayApp:
 def mouseLoop():
     global joystickFloatX, joystickFloatY, throttleX, throttleFloat
     for event in device.read_loop():
-        if event.code == evdev.ecodes.REL_WHEEL:
-            throttleX = max(-configs['throttle_segments']/2, min(throttleX + event.value, configs['throttle_segments']/2))
-            throttleFloat = throttleX / (configs['throttle_segments']/2)
-            gamepad.right_joystick_float(x_value_float=throttleFloat, y_value_float=0)
-            gamepad.update()
-        if event.type == evdev.ecodes.SYN_MT_REPORT:
-            match event.code:
-                case evdev.ecodes.REL_X:
-                    joystickFloatX = joystickFloatX + (event.value * configs['mouse_sensitivity_x'])
-                case evdev.ecodes.REL_Y:
-                    joystickFloatY = joystickFloatY + (event.value * configs['mouse_sensitivity_y'])
-
-            # ensure between 0-100%
-            joystickFloatY = max(-1, min(joystickFloatY, 1))
-            joystickFloatX = max(-1, min(joystickFloatX, 1))
-            gamepad.left_joystick_float(x_value_float=joystickFloatX, y_value_float=joystickFloatY)
+        match event.type:
+            case evdev.ecodes.EV_REL:
+                match event.code:
+                    case evdev.ecodes.REL_X:
+                        joystickFloatX = joystickFloatX + (event.value * configs['mouse_sensitivity_x'])
+                    case evdev.ecodes.REL_Y:
+                        joystickFloatY = joystickFloatY + (event.value * configs['mouse_sensitivity_y'])
+                    case evdev.ecodes.REL_WHEEL:
+                        # ensure between -1.0 and 1.0
+                        throttleX = max(-configs['throttle_segments']/2, min(throttleX + event.value, configs['throttle_segments']/2))
+                        throttleFloat = throttleX / (configs['throttle_segments']/2)
+                        gamepad.right_joystick_float(x_value_float=throttleFloat, y_value_float=0)
+                # ensure between -1.0 and 1.0
+                joystickFloatY = max(-1, min(joystickFloatY, 1))
+                joystickFloatX = max(-1, min(joystickFloatX, 1))
+                gamepad.left_joystick_float(x_value_float=joystickFloatX, y_value_float=joystickFloatY)
+            case evdev.ecodes.EV_KEY:
+                match event.code:
+                    case evdev.ecodes.BTN_LEFT:
+                        if event.value == 1:
+                            gamepad.press_button(vg.XUSB_BUTTON.XUSB_GAMEPAD_A)
+                        else:
+                            gamepad.release_button(vg.XUSB_BUTTON.XUSB_GAMEPAD_A)
+                    case evdev.ecodes.BTN_RIGHT:
+                        if event.value == 1:
+                            gamepad.press_button(vg.XUSB_BUTTON.XUSB_GAMEPAD_B)
+                        else:
+                            gamepad.release_button(vg.XUSB_BUTTON.XUSB_GAMEPAD_B)
+        if active:
             gamepad.update()
 
 
