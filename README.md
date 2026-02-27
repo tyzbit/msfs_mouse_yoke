@@ -6,6 +6,8 @@ appreciated.
 
 This is a small script written in Python that lets you fly with your mouse in 
 Microsoft Flight Simulator 2020. (Why is this not implemented in the game yet?).
+It also includes a throttle axis (technically right joystick X axis) and two
+buttons (Left and Right click mapped to A and B).
 
 
 ## How does it work?
@@ -55,7 +57,7 @@ wheel position, that way, you can use it as a throttle.
 1. "master_key": "," | The key for turning on/off the script.
 2. "throttle_segments": 10 | How many scroll-wheel steps are required to go from 0% to 100% throttle.
 3. "mouse_sensitivity_x/y": 0.002 | Sensitivity multiplier. Affects granularity of control.
-4. "center_xy_axes_key": "." | The key for centering the yoke axes.
+4. "center_xy_axes_key": "." | The key for centering the yoke axes. Note, this does not center the throttle.
 5. display_gui": true | Control whether the GUI showing the status is shown.
 
 ## Keep in mind that...
