@@ -43,6 +43,9 @@ wheel position, that way, you can use it as a throttle.
 
 ## Usage
 
+It's recommended to start this script before launching Microsoft Flight
+Simulator.
+
  1. python3 mouse_yoke.py [event device ID - optional]
  2. Pick the device to read from if the ID wasn't provided.
  3. To activate the script, press the **master_key**. Default key is comma ",".

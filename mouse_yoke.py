@@ -44,7 +44,6 @@ def onKeyRelease(key):
 
     if key == keyboard.KeyCode.from_char(configs["master_key"]):
         active = not active
-        gamepad.reset()
 
     if key == keyboard.KeyCode.from_char(configs["center_xy_axes_key"]):
         joystickFloatX = 0
