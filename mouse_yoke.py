@@ -21,46 +21,53 @@ with open("./config.json") as config_file:
 logging.basicConfig(filename=f"./logs/mouse_yoke.log", format="%(asctime)s - %(message)s")
 gamepad = vg.VX360Gamepad()
 
-joystickFloatX = 0.0
-joystickFloatY = 0.0
-throttleFloat = 0.0
-throttleX = 0
+# X1, X2, Y1, Y2, TX
+controller_values = {
+    'primary_x': 0.0,
+    'primary_y': 0.0,
+    'secondary_x': 0.0,
+    'secondary_y': 0.0,
+    'throttle_x': 0
+}
 active = False
-
-if len(sys.argv) > 1:
-    device_number = sys.argv[1]
-else:
-    devices = [evdev.InputDevice(fn) for fn in evdev.list_devices()]
-    for device in natsort.natsorted(devices, key=lambda d: d.path):
-        print(device.path, device.name)
-    device_number = input(f'Enter the number of the event device to read from: ')
-
-device = evdev.InputDevice('/dev/input/event'+device_number)
-print(f'Using {device.name} at {device.path}')
 
 def onKeyRelease(key):
     global active
-    global joystickFloatX, joystickFloatY
+    global primary_JoystickFloatX, primary_JoystickFloatY, secondary_JoystickFloatX, secondary_JoystickFloatY
 
     if key == keyboard.KeyCode.from_char(configs["master_key"]):
         active = not active
+        logging.info(f'Active: {active}')
 
     if key == keyboard.KeyCode.from_char(configs["center_xy_axes_key"]):
-        joystickFloatX = 0
-        joystickFloatY = 0
+        logging.info(f'Centering axes')
+        controller_values = {
+            'primary_x': 0.0,
+            'primary_y': 0.0,
+            'secondary_x': 0.0,
+            'secondary_y': 0.0
+            # Throttle is not zeroed
+        }
 
 def userInterface():
-    with output(initial_len=8, interval=0) as output_lines:
+    global primary_JoystickFloatX, primary_JoystickFloatY, secondary_JoystickFloatX, secondary_JoystickFloatY
+    with output(initial_len=10, interval=0) as output_lines:
         while True:
-
+            px = controller_values['primary_x']
+            py = controller_values['primary_y']            
+            sx = controller_values['secondary_x']
+            sy = controller_values['secondary_y']
+            tx = controller_values['throttle_x']
             output_lines[0] = f"+{' Status: ' + ('ACTIVE' if active else 'INACTIVE') + ' ':—^40}+"
             output_lines[1] = f"|{'':^40}|"
             output_lines[2] = f"|{'Axis':^20}{'Position':^20}|"
             output_lines[3] = f"+{'':—^40}+"
-            output_lines[4] = f"|{'X':^20}{'{:.2f}'.format((joystickFloatX + 1) * 50) + '%':^20}|"
-            output_lines[5] = f"|{'Y':^20}{'{:.2f}'.format((joystickFloatY + 1) * 50) + '%':^20}|"
-            output_lines[6] = f"|{'THROTTLE':^20}{'{:.2f}'.format((throttleFloat + 1) * 50) + '%':^20}|"
-            output_lines[7] = f"+{'':—^40}+"
+            output_lines[4] = f"|{'X1':^20}{'{:.2f}'.format((px + 1) * 50) + '%':^20}|"
+            output_lines[5] = f"|{'Y1':^20}{'{:.2f}'.format((py + 1) * 50) + '%':^20}|"
+            output_lines[6] = f"|{'X2':^20}{'{:.2f}'.format((sx + 1) * 50) + '%':^20}|"
+            output_lines[7] = f"|{'Y2':^20}{'{:.2f}'.format((sy + 1) * 50) + '%':^20}|"
+            output_lines[8] = f"|{'THROTTLE':^20}{'{:.2f}'.format((tx / configs['throttle_segments']) * 100) + '%':^20}|"
+            output_lines[9] = f"+{'':—^40}+"
 
             time.sleep(0.05)
 
@@ -97,26 +104,39 @@ class ColorDisplayApp:
             self.label.config(text = "")
             self.master.attributes('-alpha', 0.5)
         self.master.after(100, self.update_display)
+##
+# device, x variable, y variable, throttle x variable (optional)
+##
+def mouseLoop(device_name=str, device_fd=int, throttle=bool):
+    x = f'{device_name}_x'
+    y = f'{device_name}_y'
+    tx = 'throttle_x'
+    sens = f'{device_name}_mouse_sensitivity'
+    global controller_values
 
-def mouseLoop():
-    global joystickFloatX, joystickFloatY, throttleX, throttleFloat
+    try:
+        device = evdev.InputDevice(f'/dev/input/event{device_fd}')
+    except Exception as e:
+        logging.critical(f'Event device {device_name} (/dev/input/event{device_fd}) could not be opened: {e}', exec_info=True)
+        return
     for event in device.read_loop():
         match event.type:
             case evdev.ecodes.EV_REL:
                 match event.code:
                     case evdev.ecodes.REL_X:
-                        joystickFloatX = joystickFloatX + (event.value * configs['mouse_sensitivity_x'])
+                        controller_values[x] = controller_values[x] + (event.value * configs[f'{sens}_x'])
                     case evdev.ecodes.REL_Y:
-                        joystickFloatY = joystickFloatY + (event.value * configs['mouse_sensitivity_y'])
+                        controller_values[y] = controller_values[y] + (event.value * configs[f'{sens}_y'])
                     case evdev.ecodes.REL_WHEEL:
-                        # ensure between -1.0 and 1.0
-                        throttleX = max(-configs['throttle_segments']/2, min(throttleX + event.value, configs['throttle_segments']/2))
-                        throttleFloat = throttleX / (configs['throttle_segments']/2)
-                        gamepad.right_joystick_float(x_value_float=throttleFloat, y_value_float=0)
-                # ensure between -1.0 and 1.0
-                joystickFloatY = max(-1, min(joystickFloatY, 1))
-                joystickFloatX = max(-1, min(joystickFloatX, 1))
-                gamepad.left_joystick_float(x_value_float=joystickFloatX, y_value_float=joystickFloatY)
+                        if throttle:
+                            controller_values[tx] = max(0, min(controller_values[tx] + event.value, configs['throttle_segments']))
+                            # ensure between 0.0 and 1.0
+                            gamepad.left_trigger_float(value_float=(controller_values[tx] / configs['throttle_segments']))
+
+                # ensure between -1.0 and 1.0a
+                controller_values[x] = max(-1.0, min(controller_values[x], 1.0))
+                controller_values[y] = max(-1.0, min(controller_values[y], 1.0))
+                gamepad.left_joystick_float(x_value_float=controller_values[x], y_value_float=controller_values[y])
             case evdev.ecodes.EV_KEY:
                 match event.code:
                     case evdev.ecodes.BTN_LEFT:
@@ -132,7 +152,6 @@ def mouseLoop():
         if active:
             gamepad.update()
 
-
 def runTK():
     if(not configs['display_gui']):
         return
@@ -144,19 +163,46 @@ if __name__ == "__main__":
     logging.warning("mouse_yoke.py is now running\n\n")
 
     try:
+        primary_device = evdev.InputDevice
+        secondary_device = evdev.InputDevice
+        secondary_device_enabled = False
+
+        if len(sys.argv) == 3:
+            logging.info('Using two devices')
+            primary_device_number = sys.argv[1]
+            secondary_device_number = sys.argv[2]
+            secondary_device_enabled = True
+        elif len(sys.argv) == 2:
+            logging.info('Using one device')
+            primary_device_number = sys.argv[1]
+        else:
+            logging.info('Letting the user choose the devices')
+            devices = [evdev.InputDevice(fn) for fn in evdev.list_devices()]
+            for device in natsort.natsorted(devices, key=lambda d: d.path):
+                print(device.path, device.name)
+            primary_device_number = input(f'Enter the number of the first mouse to read from: ')
+            secondary_device_number = input(f'Enter the number of the second mouse to read from (Enter to skip): ')
+            if secondary_device_number:
+                logging.info('Secondary device enabled')
+                secondary_device_enabled = True
+
         pyautogui.FAILSAFE = False
         ui = Thread(target=userInterface)
-        ms = Thread(target=mouseLoop)
+        pm = Thread(target=mouseLoop, args=['primary',primary_device_number,True])
+        if secondary_device_enabled:
+            sm = Thread(target=mouseLoop, args=['secondary',secondary_device_number,False])
         kb = keyboard.Listener(on_release=onKeyRelease)
         tl = Thread(target=runTK)
         
-        ms.start()
-        kb.start()
+        pm.start()
+        if secondary_device_enabled:
+            sm.start()
         ui.start()
+        kb.start()
         tl.start()
         # Explicitly wait for SIGINT, once caught exit
         signal.signal(signal.SIGINT, sys.exit(0))
         signal.pause
 
     except Exception as e:
-        logging.critical("Exception occurred", exc_info=True)
+        logging.critical(f'Exception occurred: {e}', exc_info=True)

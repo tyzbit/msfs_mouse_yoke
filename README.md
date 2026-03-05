@@ -13,8 +13,10 @@ buttons (Left and Right click mapped to A and B).
 ## How does it work?
 
 The script is always listening for the mouse position of a device you pick and 
-it transforms that into an xbox controller input. It also listens for the scroll
-wheel position, that way, you can use it as a throttle.
+it transforms that into an xbox controller input. It can do this for two mice at
+once (each mouse is the X and Y of the left or right thumbstick). It also
+listens for the scroll wheel position from the first mouse, that way you can use
+it as a throttle.
 
 
 ## Installation
@@ -32,8 +34,10 @@ wheel position, that way, you can use it as a throttle.
 
 { 
     "master_key": ",",
-    "mouse_sensitivity_x": 0.002,
-    "mouse_sensitivity_y": 0.002,
+    "primary_mouse_sensitivity_x": 0.002,
+    "primary_mouse_sensitivity_y": 0.002,
+    "secondary_mouse_sensitivity_x": 0.002,
+    "secondary_mouse_sensitivity_y": 0.002,
     "throttle_segments": 10,
     "center_xy_axes_key": ".",
     "display_gui": true
@@ -59,7 +63,7 @@ Simulator.
 
 1. "master_key": "," | The key for turning on/off the script.
 2. "throttle_segments": 10 | How many scroll-wheel steps are required to go from 0% to 100% throttle.
-3. "mouse_sensitivity_x/y": 0.002 | Sensitivity multiplier. Affects granularity of control.
+3. "primary/secondary_mouse_sensitivity_x/y": 0.002 | Sensitivity multiplier. Affects granularity of control.
 4. "center_xy_axes_key": "." | The key for centering the yoke axes. Note, this does not center the throttle.
 5. display_gui": true | Control whether the GUI showing the status is shown.
 
