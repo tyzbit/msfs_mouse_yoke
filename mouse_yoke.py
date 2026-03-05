@@ -41,12 +41,14 @@ def onKeyRelease(key):
 
     if key == keyboard.KeyCode.from_char(configs["center_xy_axes_key"]):
         logging.info(f'Centering axes')
+        global controller_values
         controller_values = {
             'primary_x': 0.0,
             'primary_y': 0.0,
             'secondary_x': 0.0,
-            'secondary_y': 0.0
+            'secondary_y': 0.0,
             # Throttle is not zeroed
+            'throttle_x': controller_values['throttle_x']
         }
 
 def userInterface():
@@ -136,7 +138,10 @@ def mouseLoop(device_name=str, device_fd=int, throttle=bool):
                 # ensure between -1.0 and 1.0a
                 controller_values[x] = max(-1.0, min(controller_values[x], 1.0))
                 controller_values[y] = max(-1.0, min(controller_values[y], 1.0))
-                gamepad.left_joystick_float(x_value_float=controller_values[x], y_value_float=controller_values[y])
+                if device_name == 'primary':
+                    gamepad.left_joystick_float(x_value_float=controller_values[x], y_value_float=controller_values[y])
+                else:
+                    gamepad.right_joystick_float(x_value_float=controller_values[x], y_value_float=controller_values[y])
             case evdev.ecodes.EV_KEY:
                 match event.code:
                     case evdev.ecodes.BTN_LEFT:
