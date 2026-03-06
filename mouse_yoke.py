@@ -6,6 +6,9 @@ import natsort
 from pynput import keyboard
 from reprint import output
 from threading import Thread
+from datetime import timezone 
+import datetime
+import time
 import vgamepad as vg
 import logging
 import signal
@@ -30,7 +33,12 @@ controller_values = {
     'throttle_x': 0
 }
 active = False
+update_frequency = 100
+cycletime = 1/update_frequency
 
+##
+# Handles key input to start/stop and calibrate
+##
 def onKeyRelease(key):
     global active
     global primary_JoystickFloatX, primary_JoystickFloatY, secondary_JoystickFloatX, secondary_JoystickFloatY
@@ -51,6 +59,9 @@ def onKeyRelease(key):
             'throttle_x': controller_values['throttle_x']
         }
 
+##
+# Draws the simple terminal interface
+## 
 def userInterface():
     global primary_JoystickFloatX, primary_JoystickFloatY, secondary_JoystickFloatX, secondary_JoystickFloatY
     with output(initial_len=10, interval=0) as output_lines:
@@ -107,7 +118,7 @@ class ColorDisplayApp:
             self.master.attributes('-alpha', 0.5)
         self.master.after(100, self.update_display)
 ##
-# device, x variable, y variable, throttle x variable (optional)
+# Reads mouse input and updates gamepad values. The actual gamepad update happens elsewhere
 ##
 def mouseLoop(device_name=str, device_fd=int, throttle=bool):
     x = f'{device_name}_x'
@@ -135,13 +146,13 @@ def mouseLoop(device_name=str, device_fd=int, throttle=bool):
                             # ensure between 0.0 and 1.0
                             gamepad.left_trigger_float(value_float=(controller_values[tx] / configs['throttle_segments']))
 
-                # ensure between -1.0 and 1.0a
-                controller_values[x] = max(-1.0, min(controller_values[x], 1.0))
-                controller_values[y] = max(-1.0, min(controller_values[y], 1.0))
-                if device_name == 'primary':
-                    gamepad.left_joystick_float(x_value_float=controller_values[x], y_value_float=controller_values[y])
-                else:
-                    gamepad.right_joystick_float(x_value_float=controller_values[x], y_value_float=controller_values[y])
+            case evdev.ecodes.EV_ABS:
+                match event.code:
+                    case evdev.ecodes.ABS_X:
+                        controller_values[x] = (event.value / configs[f'{sens}_x']) / (32768 / 4)
+                    case evdev.ecodes.ABS_Z:
+                        controller_values[y] = (event.value / configs[f'{sens}_y']) / (32768 / 4)
+
             case evdev.ecodes.EV_KEY:
                 match event.code:
                     case evdev.ecodes.BTN_LEFT:
@@ -154,9 +165,41 @@ def mouseLoop(device_name=str, device_fd=int, throttle=bool):
                             gamepad.press_button(vg.XUSB_BUTTON.XUSB_GAMEPAD_B)
                         else:
                             gamepad.release_button(vg.XUSB_BUTTON.XUSB_GAMEPAD_B)
+
+        # ensure between -1.0 and 1.0a
+        controller_values[x] = max(-1.0, min(controller_values[x], 1.0))
+        controller_values[y] = max(-1.0, min(controller_values[y], 1.0))
+        if device_name == 'primary':
+            gamepad.left_joystick_float(x_value_float=controller_values[x], y_value_float=controller_values[y])
+        else:
+            gamepad.right_joystick_float(x_value_float=controller_values[x], y_value_float=controller_values[y])
+        
+##
+# Updates the gamepad on an accurate, consistent frequency.
+# https://github.com/yannbouteiller/vgamepad/issues/39#issuecomment-3100989230
+##
+def gamepadloop():
+    t0 = time.perf_counter()    # Time ref point in ms
+    time_counter = t0           # Will be incremented with cycletime for each iteration
+
+    while 1:
+        ### Code that will read message bytes from a port
+
+        now = time.perf_counter()
+        elapsed_time = now - time_counter
+        if elapsed_time < cycletime:
+            target_time =  cycletime - elapsed_time
+            time.sleep(target_time)
+        
+        # It's time to update the game pad
         if active:
             gamepad.update()
 
+        time_counter += cycletime
+
+##
+# Handles the graphical GUI for showing active status
+##
 def runTK():
     if(not configs['display_gui']):
         return
@@ -194,6 +237,7 @@ if __name__ == "__main__":
         pyautogui.FAILSAFE = False
         ui = Thread(target=userInterface)
         pm = Thread(target=mouseLoop, args=['primary',primary_device_number,True])
+        gl = Thread(target=gamepadloop)
         if secondary_device_enabled:
             sm = Thread(target=mouseLoop, args=['secondary',secondary_device_number,False])
         kb = keyboard.Listener(on_release=onKeyRelease)
@@ -205,6 +249,7 @@ if __name__ == "__main__":
         ui.start()
         kb.start()
         tl.start()
+        gl.start()
         # Explicitly wait for SIGINT, once caught exit
         signal.signal(signal.SIGINT, sys.exit(0))
         signal.pause
