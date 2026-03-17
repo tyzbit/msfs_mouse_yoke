@@ -1,7 +1,7 @@
 { 
     "master_key": ",",
-    "primary_mouse_sensitivity_x": 0.2,
-    "primary_mouse_sensitivity_y": 0.2,
+    "primary_mouse_sensitivity_x": 0.002,
+    "primary_mouse_sensitivity_y": 0.002,
     "secondary_mouse_sensitivity_x": 0.2,
     "secondary_mouse_sensitivity_y": 0.2,
     "throttle_segments": 10,
