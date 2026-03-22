@@ -117,6 +117,30 @@ class ColorDisplayApp:
             self.label.config(text = "")
             self.master.attributes('-alpha', 0.5)
         self.master.after(100, self.update_display)
+
+
+# https://www.rawmeat.org/code/python-exponential-smoothing/
+def exponential_moving_average(period=int):
+    """ Exponential moving average. Smooths the values over the period.  Send
+    in values - at first it'll return a simple average, but as soon as it's
+    gathered 'period' values, it'll start to use the Exponential Moving
+    Averge to smooth the values.
+
+    period: int - how many values to smooth over (default=1000). """
+    multiplier = 2 / float(1 + period)
+    cumulative_temp = yield None  # We are being primed
+
+    # Start by just returning the simple average until we have enough data.
+    for i in list(range(1, period + 1)):
+        cumulative_temp += yield cumulative_temp / float(i)
+
+    # Grab the simple average,
+    ema = cumulative_temp / period
+
+    # and start calculating the exponentially smoothed average we want.
+    while True:
+        ema = (((yield ema) - ema) * multiplier) + ema
+
 ##
 # Reads mouse input and updates gamepad values. The actual gamepad update happens elsewhere
 ##
@@ -132,6 +156,16 @@ def mouseLoop(device_name=str, device_fd=int, throttle=bool):
     except Exception as e:
         logging.critical(f'Event device {device_name} (/dev/input/event{device_fd}) could not be opened: {e}', exec_info=True)
         return
+
+    primary_ema_x = exponential_moving_average(configs['primary_mouse_smoothing'])
+    next(primary_ema_x)  # Prime the generator
+    primary_ema_y = exponential_moving_average(configs['primary_mouse_smoothing'])
+    next(primary_ema_y)  # Prime the generator
+    secondary_ema_x = exponential_moving_average(configs['secondary_mouse_smoothing'])
+    next(secondary_ema_x)  # Prime the generator
+    secondary_ema_y = exponential_moving_average(configs['secondary_mouse_smoothing'])
+    next(secondary_ema_y)  # Prime the generator
+
     for event in device.read_loop():
         match event.type:
             case evdev.ecodes.EV_REL:
@@ -170,8 +204,12 @@ def mouseLoop(device_name=str, device_fd=int, throttle=bool):
         controller_values[x] = max(-1.0, min(controller_values[x], 1.0))
         controller_values[y] = max(-1.0, min(controller_values[y], 1.0))
         if device_name == 'primary':
+            controller_values[x] = primary_ema_x.send(controller_values[x])
+            controller_values[y] = primary_ema_y.send(controller_values[y])
             gamepad.left_joystick_float(x_value_float=controller_values[x], y_value_float=controller_values[y])
         else:
+            controller_values[x] = secondary_ema_x.send(controller_values[x])
+            controller_values[y] = secondary_ema_y.send(controller_values[y])
             gamepad.right_joystick_float(x_value_float=controller_values[x], y_value_float=controller_values[y])
         
 ##

@@ -36,8 +36,10 @@ it as a throttle.
     "master_key": ",",
     "primary_mouse_sensitivity_x": 0.002,
     "primary_mouse_sensitivity_y": 0.002,
-    "secondary_mouse_sensitivity_x": 0.002,
-    "secondary_mouse_sensitivity_y": 0.002,
+    "primary_mouse_smoothing": 40,
+    "secondary_mouse_sensitivity_x": 0.2,
+    "secondary_mouse_sensitivity_y": 0.2,
+    "secondary_mouse_smoothing": 1,
     "throttle_segments": 10,
     "center_xy_axes_key": ".",
     "display_gui": true
@@ -64,8 +66,10 @@ Simulator.
 1. "master_key": "," | The key for turning on/off the script.
 2. "throttle_segments": 10 | How many scroll-wheel steps are required to go from 0% to 100% throttle.
 3. "primary/secondary_mouse_sensitivity_x/y": 0.002 | Sensitivity multiplier. Affects granularity of control.
-4. "center_xy_axes_key": "." | The key for centering the yoke axes. Note, this does not center the throttle.
-5. display_gui": true | Control whether the GUI showing the status is shown.
+4. "primary/secondary_mouse_smoothing": 1 | Smooth the values in case of noise or jostling. Must be greater than 0, 10-40 probably will work best but depends on the update frequency of your device.
+5. "center_xy_axes_key": "." | The key for centering the yoke axes. Note, this does not center the throttle.
+6. "display_gui": true | Control whether the GUI showing the status is shown.
+
 
 ## Keep in mind that...
 - When you are setting up the bindings in the game, I recommend removing ALL bindings that are set by default for xbox controllers, and leaving only the axis that you need (which are only two).\
