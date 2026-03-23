@@ -57,6 +57,10 @@ Simulator.
  3. To activate the script, press the **master_key**. Default key is comma ",".
  4. If possible, disable the mouse in KDE so you can still use your cursor normally.
 
+Instead of the event device ID you can also provide a string (regex allowed) to
+look for a device with that name. This is useful because event device IDs are not
+deterministic.
+
 ![disable_mouse](disable_mouse.png)
     
 ![inactive_state](inactive_state.png)

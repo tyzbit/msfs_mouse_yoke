@@ -6,13 +6,12 @@ import natsort
 from pynput import keyboard
 from reprint import output
 from threading import Thread
-from datetime import timezone 
-import datetime
 import time
 import vgamepad as vg
 import logging
 import signal
 import sys
+import re
 import json
 import time
 import tkinter as tk
@@ -142,9 +141,12 @@ def exponential_moving_average(period=int):
         ema = (((yield ema) - ema) * multiplier) + ema
 
 ##
-# Reads mouse input and updates gamepad values. The actual gamepad update happens elsewhere
+# Reads mouse input and updates gamepad values. The actual gamepad update happens elsewhere.
+# device_name: primary/secondary
+# device_descriptor: number of event device or partial device name to be regexed
+# throttle: enable/disable use of scroll wheel for throttle
 ##
-def mouseLoop(device_name=str, device_fd=int, throttle=bool):
+def mouseLoop(device_name=str, device_descriptor=str, throttle=bool):
     x = f'{device_name}_x'
     y = f'{device_name}_y'
     tx = 'throttle_x'
@@ -152,9 +154,17 @@ def mouseLoop(device_name=str, device_fd=int, throttle=bool):
     global controller_values
 
     try:
-        device = evdev.InputDevice(f'/dev/input/event{device_fd}')
+        if not device_descriptor.isdigit():
+            devices = [evdev.InputDevice(fn) for fn in evdev.list_devices()]
+            for device in devices:
+                if re.search(device_descriptor, device.name, re.IGNORECASE):
+                    device = evdev.InputDevice(device.path)
+                    break
+        else:
+            device = evdev.InputDevice(f'/dev/input/event{device_descriptor}')
     except Exception as e:
-        logging.critical(f'Event device {device_name} (/dev/input/event{device_fd}) could not be opened: {e}', exec_info=True)
+        logging.critical(f'Event device {device_name} (/dev/input/event{device_descriptor}) could not be opened: {e}', exec_info=True)
+        sys.exit(1)
         return
 
     primary_ema_x = exponential_moving_average(configs['primary_mouse_smoothing'])
