@@ -20,7 +20,7 @@ import tkinter as tk
 with open("./config.json") as config_file:
     configs = json.load(config_file)
 
-logging.basicConfig(filename=f"./logs/mouse_yoke.log", format="%(asctime)s - %(message)s")
+logging.basicConfig(filename=f"./logs/mouse_yoke.log", format="%(asctime)s - %(message)s", level='INFO')
 gamepad = vg.VX360Gamepad()
 
 # X1, X2, Y1, Y2, TX
@@ -152,76 +152,84 @@ def mouseLoop(device_name=str, device_descriptor=str, throttle=bool):
     tx = 'throttle_x'
     sens = f'{device_name}_mouse_sensitivity'
     global controller_values
-
-    try:
+    
+    while True:
         if not device_descriptor.isdigit():
             devices = [evdev.InputDevice(fn) for fn in evdev.list_devices()]
             for device in devices:
                 if re.search(device_descriptor, device.name, re.IGNORECASE):
+                    logging.info(f'{device.name} matches {device_descriptor}, selecting')
                     device = evdev.InputDevice(device.path)
                     break
         else:
+            logging.info(f'Device selected manually: {device_descriptor}')
             device = evdev.InputDevice(f'/dev/input/event{device_descriptor}')
-    except Exception as e:
-        logging.critical(f'Event device {device_name} (/dev/input/event{device_descriptor}) could not be opened: {e}', exec_info=True)
-        sys.exit(1)
-        return
-
-    primary_ema_x = exponential_moving_average(configs['primary_mouse_smoothing'])
-    next(primary_ema_x)  # Prime the generator
-    primary_ema_y = exponential_moving_average(configs['primary_mouse_smoothing'])
-    next(primary_ema_y)  # Prime the generator
-    secondary_ema_x = exponential_moving_average(configs['secondary_mouse_smoothing'])
-    next(secondary_ema_x)  # Prime the generator
-    secondary_ema_y = exponential_moving_average(configs['secondary_mouse_smoothing'])
-    next(secondary_ema_y)  # Prime the generator
-
-    for event in device.read_loop():
-        match event.type:
-            case evdev.ecodes.EV_REL:
-                match event.code:
-                    case evdev.ecodes.REL_X:
-                        controller_values[x] = controller_values[x] + (event.value * configs[f'{sens}_x'])
-                    case evdev.ecodes.REL_Y:
-                        controller_values[y] = controller_values[y] + (event.value * configs[f'{sens}_y'])
-                    case evdev.ecodes.REL_WHEEL:
-                        if throttle:
-                            controller_values[tx] = max(0, min(controller_values[tx] + event.value, configs['throttle_segments']))
-                            # ensure between 0.0 and 1.0
-                            gamepad.left_trigger_float(value_float=(controller_values[tx] / configs['throttle_segments']))
-
-            case evdev.ecodes.EV_ABS:
-                match event.code:
-                    case evdev.ecodes.ABS_X:
-                        controller_values[x] = (event.value / configs[f'{sens}_x']) / (32768 / 4)
-                    case evdev.ecodes.ABS_Z:
-                        controller_values[y] = (event.value / configs[f'{sens}_y']) / (32768 / 4)
-
-            case evdev.ecodes.EV_KEY:
-                match event.code:
-                    case evdev.ecodes.BTN_LEFT:
-                        if event.value == 1:
-                            gamepad.press_button(vg.XUSB_BUTTON.XUSB_GAMEPAD_A)
-                        else:
-                            gamepad.release_button(vg.XUSB_BUTTON.XUSB_GAMEPAD_A)
-                    case evdev.ecodes.BTN_RIGHT:
-                        if event.value == 1:
-                            gamepad.press_button(vg.XUSB_BUTTON.XUSB_GAMEPAD_B)
-                        else:
-                            gamepad.release_button(vg.XUSB_BUTTON.XUSB_GAMEPAD_B)
-
-        # ensure between -1.0 and 1.0a
-        controller_values[x] = max(-1.0, min(controller_values[x], 1.0))
-        controller_values[y] = max(-1.0, min(controller_values[y], 1.0))
-        if device_name == 'primary':
-            controller_values[x] = primary_ema_x.send(controller_values[x])
-            controller_values[y] = primary_ema_y.send(controller_values[y])
-            gamepad.left_joystick_float(x_value_float=controller_values[x], y_value_float=controller_values[y])
-        else:
-            controller_values[x] = secondary_ema_x.send(controller_values[x])
-            controller_values[y] = secondary_ema_y.send(controller_values[y])
-            gamepad.right_joystick_float(x_value_float=controller_values[x], y_value_float=controller_values[y])
         
+        # Test that the device works
+        if not device.info.vendor:
+            time.sleep(1)
+            continue
+
+        logging.info(f'{device_name} device initialized')
+        primary_ema_x = exponential_moving_average(configs['primary_mouse_smoothing'])
+        next(primary_ema_x)  # Prime the generator
+        primary_ema_y = exponential_moving_average(configs['primary_mouse_smoothing'])
+        next(primary_ema_y)  # Prime the generator
+        secondary_ema_x = exponential_moving_average(configs['secondary_mouse_smoothing'])
+        next(secondary_ema_x)  # Prime the generator
+        secondary_ema_y = exponential_moving_average(configs['secondary_mouse_smoothing'])
+        next(secondary_ema_y)  # Prime the generator
+
+        try:
+            for event in device.read_loop():
+                match event.type:
+                    case evdev.ecodes.EV_REL:
+                        match event.code:
+                            case evdev.ecodes.REL_X:
+                                controller_values[x] = controller_values[x] + (event.value * configs[f'{sens}_x'])
+                            case evdev.ecodes.REL_Y:
+                                controller_values[y] = controller_values[y] + (event.value * configs[f'{sens}_y'])
+                            case evdev.ecodes.REL_WHEEL:
+                                if throttle:
+                                    controller_values[tx] = max(0, min(controller_values[tx] + event.value, configs['throttle_segments']))
+                                    # ensure between 0.0 and 1.0
+                                    gamepad.left_trigger_float(value_float=(controller_values[tx] / configs['throttle_segments']))
+
+                    case evdev.ecodes.EV_ABS:
+                        match event.code:
+                            case evdev.ecodes.ABS_X:
+                                controller_values[x] = (event.value / configs[f'{sens}_x']) / (32768 / 4)
+                            case evdev.ecodes.ABS_Z:
+                                controller_values[y] = (event.value / configs[f'{sens}_y']) / (32768 / 4)
+
+                    case evdev.ecodes.EV_KEY:
+                        match event.code:
+                            case evdev.ecodes.BTN_LEFT:
+                                if event.value == 1:
+                                    gamepad.press_button(vg.XUSB_BUTTON.XUSB_GAMEPAD_A)
+                                else:
+                                    gamepad.release_button(vg.XUSB_BUTTON.XUSB_GAMEPAD_A)
+                            case evdev.ecodes.BTN_RIGHT:
+                                if event.value == 1:
+                                    gamepad.press_button(vg.XUSB_BUTTON.XUSB_GAMEPAD_B)
+                                else:
+                                    gamepad.release_button(vg.XUSB_BUTTON.XUSB_GAMEPAD_B)
+
+                # ensure between -1.0 and 1.0a
+                controller_values[x] = max(-1.0, min(controller_values[x], 1.0))
+                controller_values[y] = max(-1.0, min(controller_values[y], 1.0))
+                if device_name == 'primary':
+                    controller_values[x] = primary_ema_x.send(controller_values[x])
+                    controller_values[y] = primary_ema_y.send(controller_values[y])
+                    gamepad.left_joystick_float(x_value_float=controller_values[x], y_value_float=controller_values[y])
+                else:
+                    controller_values[x] = secondary_ema_x.send(controller_values[x])
+                    controller_values[y] = secondary_ema_y.send(controller_values[y])
+                    gamepad.right_joystick_float(x_value_float=controller_values[x], y_value_float=controller_values[y])
+        except:
+            logging.warning(f'Error with {device_name}, attempting to reacquire')
+            continue
+
 ##
 # Updates the gamepad on an accurate, consistent frequency.
 # https://github.com/yannbouteiller/vgamepad/issues/39#issuecomment-3100989230
