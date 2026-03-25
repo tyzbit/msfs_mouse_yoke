@@ -1,4 +1,3 @@
-from pyautogui import size, moveTo
 import pyautogui
 import evdev
 import natsort
