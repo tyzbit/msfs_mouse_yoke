@@ -80,7 +80,7 @@ def userInterface():
             output_lines[8] = f"|{'THROTTLE':^20}{'{:.2f}'.format((tx / configs['throttle_segments']) * 100) + '%':^20}|"
             output_lines[9] = f"+{'':—^40}+"
 
-            time.sleep(0.05)
+            time.sleep(0.1)
 
 
 class ColorDisplayApp:
