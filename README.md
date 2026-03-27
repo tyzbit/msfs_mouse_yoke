@@ -42,7 +42,8 @@ it as a throttle.
     "secondary_mouse_smoothing": 1,
     "throttle_segments": 10,
     "center_xy_axes_key": ".",
-    "display_gui": true
+    "display_gui": true,
+    "start_active": false
 }
 
 ```
@@ -73,6 +74,7 @@ deterministic.
 4. "primary/secondary_mouse_smoothing": 1 | Smooth the values in case of noise or jostling. Must be greater than 0, 10-40 probably will work best but depends on the update frequency of your device.
 5. "center_xy_axes_key": "." | The key for centering the yoke axes. Note, this does not center the throttle.
 6. "display_gui": true | Control whether the GUI showing the status is shown. This can also be special keys like right shift.
+7. "start_active": false | Start reporting inputs immediately instead of waiting for the `master_key`
 
 
 ## Keep in mind that...

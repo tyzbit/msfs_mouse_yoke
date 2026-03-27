@@ -30,7 +30,7 @@ controller_values = {
     'secondary_y': 0.0,
     'throttle_x': 0
 }
-active = False
+active = configs["start_active"]
 update_frequency = 100
 cycletime = 1/update_frequency
 
