@@ -37,15 +37,16 @@ cycletime = 1/update_frequency
 ##
 # Handles key input to start/stop and calibrate
 ##
-def onKeyRelease(key):
+def onKeyRelease(key=keyboard.KeyCode):
     global active
     global primary_JoystickFloatX, primary_JoystickFloatY, secondary_JoystickFloatX, secondary_JoystickFloatY
 
-    if key == keyboard.KeyCode.from_char(configs["master_key"]):
+    # Alphanumeric keys get printed with single quotes
+    if str.replace(f'{key}', "'", "") == configs["master_key"]:
         active = not active
         logging.info(f'Active: {active}')
 
-    if key == keyboard.KeyCode.from_char(configs["center_xy_axes_key"]):
+    if str.replace(f'{key}', "'", "") == configs["center_xy_axes_key"]:
         logging.info(f'Centering axes')
         global controller_values
         controller_values = {

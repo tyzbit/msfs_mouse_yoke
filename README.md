@@ -67,12 +67,12 @@ deterministic.
 
 ## Settings in detail
 
-1. "master_key": "," | The key for turning on/off the script.
+1. "master_key": "," | The key for turning on/off the script. You can use keys such as `Key.shift_r` for right shift instead of letters if you wish. [Here's a list of what's available](https://github.com/moses-palmer/pynput/blob/master/lib/pynput/keyboard/_base.py#L162)
 2. "throttle_segments": 10 | How many scroll-wheel steps are required to go from 0% to 100% throttle.
 3. "primary/secondary_mouse_sensitivity_x/y": 0.002 | Sensitivity multiplier. Affects granularity of control.
 4. "primary/secondary_mouse_smoothing": 1 | Smooth the values in case of noise or jostling. Must be greater than 0, 10-40 probably will work best but depends on the update frequency of your device.
 5. "center_xy_axes_key": "." | The key for centering the yoke axes. Note, this does not center the throttle.
-6. "display_gui": true | Control whether the GUI showing the status is shown.
+6. "display_gui": true | Control whether the GUI showing the status is shown. This can also be special keys like right shift.
 
 
 ## Keep in mind that...
