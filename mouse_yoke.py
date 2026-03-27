@@ -49,6 +49,9 @@ def onKeyRelease(key=keyboard.KeyCode):
     if str.replace(f'{key}', "'", "") == configs["center_xy_axes_key"]:
         logging.info(f'Centering axes')
         global controller_values
+        gamepad.left_joystick_float(0,0)
+        gamepad.right_joystick_float(0,0)
+        gamepad.update()
         controller_values = {
             'primary_x': 0.0,
             'primary_y': 0.0,
