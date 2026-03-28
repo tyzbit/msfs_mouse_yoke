@@ -88,4 +88,7 @@ deterministic.
 reason this was forked and rewritten in the first place, so the real mouse
 wouldn't be manipulated)
 
+- If the map constantly spins, deactivate and then calibrate. Make sure to 
+reactivate when you load in.
+
 Happy flying!
