@@ -22,13 +22,20 @@ with open("./config.json") as config_file:
 logging.basicConfig(filename=f"./logs/mouse_yoke.log", format="%(asctime)s - %(message)s", level='INFO')
 gamepad = vg.VX360Gamepad()
 
+mouse_precision = 32768
+
 # X1, X2, Y1, Y2, TX
 controller_values = {
     'primary_x': 0.0,
     'primary_y': 0.0,
+    'primary_x_offset': 0.0,
+    'primary_y_offset': 0.0,
     'secondary_x': 0.0,
     'secondary_y': 0.0,
-    'throttle_x': 0
+    'secondary_x_offset': 0.0,
+    'secondary_y_offset': 0.0,
+    'throttle_x': 0,
+    'throttle_x_offset': 0
 }
 active = configs["start_active"]
 update_frequency = 100
@@ -39,7 +46,8 @@ cycletime = 1/update_frequency
 ##
 def onKeyRelease(key=keyboard.KeyCode):
     global active
-    global primary_JoystickFloatX, primary_JoystickFloatY, secondary_JoystickFloatX, secondary_JoystickFloatY
+    global controller_values
+    ov = controller_values
 
     # Alphanumeric keys get printed with single quotes
     if str.replace(f'{key}', "'", "") == configs["master_key"]:
@@ -48,28 +56,31 @@ def onKeyRelease(key=keyboard.KeyCode):
 
     if str.replace(f'{key}', "'", "") == configs["center_xy_axes_key"]:
         logging.info(f'Centering axes')
-        global controller_values
         gamepad.left_joystick_float(0,0)
         gamepad.right_joystick_float(0,0)
         gamepad.update()
         controller_values = {
             'primary_x': 0.0,
             'primary_y': 0.0,
+            'primary_x_offset': ov['primary_x']+ov['primary_x_offset'],
+            'primary_y_offset': ov['primary_y']+ov['primary_y_offset'],
             'secondary_x': 0.0,
             'secondary_y': 0.0,
-            # Throttle is not zeroed
-            'throttle_x': controller_values['throttle_x']
+            'secondary_x_offset': ov['secondary_x']+ov['primary_y_offset'],
+            'secondary_y_offset': ov['secondary_y']+ov['secondary_y_offset'],
+            'throttle_x': 0.0,
+            'throttle_x_offset': ov['throttle_x']
         }
 
 ##
 # Draws the simple terminal interface
 ## 
 def userInterface():
-    global primary_JoystickFloatX, primary_JoystickFloatY, secondary_JoystickFloatX, secondary_JoystickFloatY
     with output(initial_len=10, interval=0) as output_lines:
         while True:
+            global controller_values
             px = controller_values['primary_x']
-            py = controller_values['primary_y']            
+            py = controller_values['primary_y']
             sx = controller_values['secondary_x']
             sy = controller_values['secondary_y']
             tx = controller_values['throttle_x']
@@ -183,27 +194,30 @@ def mouseLoop(device_name=str, device_descriptor=str, throttle=bool):
         secondary_ema_y = exponential_moving_average(configs['secondary_mouse_smoothing'])
         next(secondary_ema_y)  # Prime the generator
 
+        logging.debug('Before try')
         try:
             for event in device.read_loop():
                 match event.type:
                     case evdev.ecodes.EV_REL:
                         match event.code:
                             case evdev.ecodes.REL_X:
-                                controller_values[x] = controller_values[x] + (event.value * configs[f'{sens}_x'])
+                                controller_values[x] = controller_values[x] + (event.value * configs[f'{sens}_x'] - controller_values[f'{x}_offset'])
                             case evdev.ecodes.REL_Y:
-                                controller_values[y] = controller_values[y] + (event.value * configs[f'{sens}_y'])
+                                controller_values[y] = controller_values[y] + (event.value * configs[f'{sens}_y'] - controller_values[f'{x}_offset'])
                             case evdev.ecodes.REL_WHEEL:
                                 if throttle:
-                                    controller_values[tx] = max(0, min(controller_values[tx] + event.value, configs['throttle_segments']))
+                                    controller_values[tx] = max(0, min(controller_values[tx] + event.value + controller_values[f'{tx}_offset'], configs['throttle_segments']))
                                     # ensure between 0.0 and 1.0
                                     gamepad.left_trigger_float(value_float=(controller_values[tx] / configs['throttle_segments']))
 
                     case evdev.ecodes.EV_ABS:
                         match event.code:
                             case evdev.ecodes.ABS_X:
-                                controller_values[x] = (event.value / configs[f'{sens}_x']) / (32768 / 4)
-                            case evdev.ecodes.ABS_Z:
-                                controller_values[y] = (event.value / configs[f'{sens}_y']) / (32768 / 4)
+                                raw_x = (event.value * configs[f'{sens}_x'] + (mouse_precision/2)) / mouse_precision/2
+                                controller_values[x] = raw_x - 1 - controller_values[f'{x}_offset']
+                            case evdev.ecodes.ABS_Y:
+                                raw_y = (event.value * configs[f'{sens}_y'] + (mouse_precision/2)) / mouse_precision/2
+                                controller_values[y] = raw_y - 1 - controller_values[f'{y}_offset']
 
                     case evdev.ecodes.EV_KEY:
                         match event.code:
@@ -229,8 +243,8 @@ def mouseLoop(device_name=str, device_descriptor=str, throttle=bool):
                     controller_values[x] = secondary_ema_x.send(controller_values[x])
                     controller_values[y] = secondary_ema_y.send(controller_values[y])
                     gamepad.right_joystick_float(x_value_float=controller_values[x], y_value_float=controller_values[y])
-        except:
-            logging.warning(f'Error with {device_name}, attempting to reacquire')
+        except KeyError as key_error:
+            logging.warning(f'Error with {device_name}, attempting to reacquire: {key_error}')
             continue
 
 ##
