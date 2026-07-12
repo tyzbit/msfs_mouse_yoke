@@ -243,8 +243,8 @@ def mouseLoop(device_name=str, device_descriptor=str, throttle=bool):
                     controller_values[x] = secondary_ema_x.send(controller_values[x])
                     controller_values[y] = secondary_ema_y.send(controller_values[y])
                     gamepad.right_joystick_float(x_value_float=controller_values[x], y_value_float=controller_values[y])
-        except KeyError as key_error:
-            logging.warning(f'Error with {device_name}, attempting to reacquire: {key_error}')
+        except Exception as e:
+            logging.warning(f'Error with {device_name}, attempting to reacquire: {e}')
             continue
 
 ##
