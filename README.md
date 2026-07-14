@@ -29,23 +29,22 @@ it as a throttle.
 5. sudo apt-get install python3-tk python3-dev
 6. pip3 -r requirements.txt
 
-```javascript
-// config.json
-
-{ 
-    "activation_key": ",",
-    "primary_mouse_sensitivity_x": 1,
-    "primary_mouse_sensitivity_y": 1,
-    "primary_mouse_smoothing": 40,
-    "secondary_mouse_sensitivity_x": 1,
-    "secondary_mouse_sensitivity_y": 1,
-    "secondary_mouse_smoothing": 1,
-    "throttle_segments": 10,
-    "center_xy_axes_key": ".",
-    "display_gui": true,
-    "start_active": false
-}
-
+```yaml
+# config.yaml
+activation_key: Key.shift_r # This turns on the virtual controller
+center_xy_axes_key: Key.alt_r # Calibrate
+display_gui: false # Show a small window in the top left with the status
+start_active: true # Turn the virtual controller on immediately at start
+update_frequency: 95 # How many times per second to report values. Best not to exceed 100.
+primary_mouse: &primary_mouse
+  smoothing: 30 # Average using the last X measurements. Higher numbers increase perceived input lag.
+  swap_axes: false # Swap axes, though MSFS can map any axis to any control
+  absolute: false # Mice are relative, other devices can be either.
+  sensitivity:
+    x: 0.05 # If using absolute, the sensitivity should probably be 20 or more
+    y: 0.05
+secondary_mouse: *primary_mouse # This is a YAML trick to set up the secondary mouse the same as the primary
+throttle_segments: 10 # Throttle is increased by 10% (100/10). Another example: 20 -> 5% (100/20)
 ```
 
 ## Usage
@@ -65,16 +64,6 @@ deterministic.
 ![disable_mouse](disable_mouse.png)
     
 ![inactive_state](inactive_state.png)
-
-## Settings in detail
-
-1. "master_key": "," | The key for turning on/off the script. You can use keys such as `Key.shift_r` for right shift instead of letters if you wish. [Here's a list of what's available](https://github.com/moses-palmer/pynput/blob/master/lib/pynput/keyboard/_base.py#L162)
-2. "throttle_segments": 10 | How many scroll-wheel steps are required to go from 0% to 100% throttle.
-3. "primary/secondary_mouse_sensitivity_x/y": 1 | Sensitivity multiplier. Affects granularity of control.
-4. "primary/secondary_mouse_smoothing": 1 | Smooth the values in case of noise or jostling. Must be greater than 0, 10-40 probably will work best but depends on the update frequency of your device.
-5. "center_xy_axes_key": "." | The key for centering the yoke axes. Note, this does not center the throttle.
-6. "display_gui": true | Control whether the GUI showing the status is shown. This can also be special keys like right shift.
-7. "start_active": false | Start reporting inputs immediately instead of waiting for the `master_key`
 
 
 ## Keep in mind that...

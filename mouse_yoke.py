@@ -37,6 +37,8 @@ controller_values = {
 active = config["start_active"]
 update_frequency = config['update_frequency'] # Updates per second for controllers
 cycletime = 1/update_frequency
+calibration_file = './calibration-config.yaml'
+
 
 # https://www.rawmeat.org/code/python-exponential-smoothing/
 def exponential_moving_average(period=int):
@@ -109,6 +111,20 @@ def onKeyRelease(key=keyboard.KeyCode):
             'throttle_x': 0.0,
             'throttle_x_offset': ov['throttle_x']
         }
+        calibration_config = {
+            "primary_mouse_x": 0,
+            "primary_mouse_y": 0,
+            "secondary_mouse_x": 0,
+            "secondary_mouse_y": 0
+        }
+        calibration_config['primary_mouse_x'] = ov['primary_x']+ov['primary_x_offset']
+        calibration_config['primary_mouse_y'] = ov['primary_y']+ov['primary_y_offset']
+        calibration_config['secondary_mouse_x'] = ov['secondary_x']+ov['secondary_x_offset']
+        calibration_config['secondary_mouse_y'] = ov['secondary_y']+ov['secondary_y_offset']
+        with open(calibration_file, 'w+') as test_config:
+            test_config.truncate(0)
+            test_config.write(yaml.dump(calibration_config))
+        
 
 ##
 # Draws the simple terminal interface
@@ -208,13 +224,12 @@ def mouseLoop(device_name=str, device_descriptor=str, throttle=bool):
                         if not config[f'{device_name}_mouse']['absolute']:
                             match event.code:
                                 case evdev.ecodes.REL_X:
-                                    # divide by 100 so sensitivies don't need to be in the hundreds in the config
-                                    sensitivity = config[f'{device_name}_mouse']['sensitivity']['x'] / 100
+                                    sensitivity = config[f'{device_name}_mouse']['sensitivity']['x']
                                     controller_values[x] = controller_values[x] + (event.value * sensitivity)
                                     # The offset for relative controllers should always be zero
                                     controller_values['f{x}_offset'] = 0
                                 case evdev.ecodes.REL_Y:
-                                    sensitivity = config[f'{device_name}_mouse']['sensitivity']['y'] / 100
+                                    sensitivity = config[f'{device_name}_mouse']['sensitivity']['y']
                                     controller_values[y] = controller_values[y] + (event.value * sensitivity)
                                     # The offset for relative controllers should always be zero
                                     controller_values['f{y}_offset'] = 0
@@ -229,12 +244,11 @@ def mouseLoop(device_name=str, device_descriptor=str, throttle=bool):
                         if config[f'{device_name}_mouse']['absolute']:
                             match event.code:
                                 case evdev.ecodes.ABS_X:
-                                    # multiply by 10 so sensitivies don't need to be super tiny in the config
-                                    sensitivity = config[f'{device_name}_mouse']['sensitivity']['x'] * 10
+                                    sensitivity = config[f'{device_name}_mouse']['sensitivity']['x']
                                     raw_x = (event.value * sensitivity + (absolute_degrees/2)) / absolute_degrees/2
                                     controller_values[x] = raw_x - 1 - controller_values[f'{x}_offset']
                                 case evdev.ecodes.ABS_Y:
-                                    sensitivity = config[f'{device_name}_mouse']['sensitivity']['y'] * 10
+                                    sensitivity = config[f'{device_name}_mouse']['sensitivity']['y']
                                     raw_y = (event.value * sensitivity + (absolute_degrees/2)) / absolute_degrees/2
                                     controller_values[y] = raw_y - 1 - controller_values[f'{y}_offset']
                         else:
@@ -341,6 +355,13 @@ if __name__ == "__main__":
 
         pyautogui.FAILSAFE = False
         ui = Thread(target=userInterface)
+        # offsets only matter for absolute devices
+        with open(calibration_file) as calibration:
+            calibration_config = yaml.safe_load(calibration)
+            controller_values['primary_x_offset'] = calibration_config['primary_mouse_x']
+            controller_values['primary_y_offset'] = calibration_config['primary_mouse_y']
+            controller_values['secondary_x_offset'] = calibration_config['secondary_mouse_x']
+            controller_values['secondary_y_offset'] = calibration_config['secondary_mouse_y']
         pm = Thread(target=mouseLoop, args=['primary',primary_device_number,True])
         gl = Thread(target=gamepadloop)
         if secondary_device_enabled:
