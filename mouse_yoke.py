@@ -193,11 +193,13 @@ class ColorDisplayApp:
 # throttle: enable/disable use of scroll wheel for throttle
 ##
 def mouseLoop(device_name=str, device_descriptor=str, throttle=bool):
-    x = f'{device_name}_x'
-    y = f'{device_name}_y'
-    tx = 'throttle_x'
     global controller_values, config
     global primary_ema_x,primary_ema_y,secondary_ema_x,secondary_ema_y
+    x = f'{device_name}_x'
+    y = f'{device_name}_y'
+    if config[f'{device_name}_mouse']['swap_axes']:
+        x,y = y,x
+    tx = 'throttle_x'
     
     while True:
         if not device_descriptor.isdigit():
@@ -244,13 +246,19 @@ def mouseLoop(device_name=str, device_descriptor=str, throttle=bool):
                         if config[f'{device_name}_mouse']['absolute']:
                             match event.code:
                                 case evdev.ecodes.ABS_X:
-                                    sensitivity = config[f'{device_name}_mouse']['sensitivity']['x']
-                                    raw_x = (event.value * sensitivity + (absolute_degrees/2)) / absolute_degrees/2
-                                    controller_values[x] = raw_x - 1 - controller_values[f'{x}_offset']
+                                    if not config[f'{device_name}_mouse']['swap_x_for_z']:
+                                        sensitivity = config[f'{device_name}_mouse']['sensitivity']['x']
+                                        raw_x = (event.value * sensitivity + (absolute_degrees/2)) / absolute_degrees/2
+                                        controller_values[x] = raw_x - 1 - controller_values[f'{x}_offset']
                                 case evdev.ecodes.ABS_Y:
                                     sensitivity = config[f'{device_name}_mouse']['sensitivity']['y']
                                     raw_y = (event.value * sensitivity + (absolute_degrees/2)) / absolute_degrees/2
                                     controller_values[y] = raw_y - 1 - controller_values[f'{y}_offset']
+                                case evdev.ecodes.ABS_Z:
+                                    if config[f'{device_name}_mouse']['swap_x_for_z']:
+                                        sensitivity = config[f'{device_name}_mouse']['sensitivity']['x']
+                                        raw_x = (event.value * sensitivity + (absolute_degrees/2)) / absolute_degrees/2
+                                        controller_values[x] = raw_x - 1 - controller_values[f'{x}_offset']
                         else:
                             match event.code:
                                 case evdev.ecodes.ABS_RX:

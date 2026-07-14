@@ -31,20 +31,21 @@ it as a throttle.
 
 ```yaml
 # config.yaml
-activation_key: Key.shift_r # This turns on the virtual controller
-center_xy_axes_key: Key.alt_r # Calibrate
-display_gui: false # Show a small window in the top left with the status
-start_active: true # Turn the virtual controller on immediately at start
+activation_key: Key.shift_r # This turns on the virtual controller.
+center_xy_axes_key: Key.alt_r # Calibrate.
+display_gui: false # Show a small window in the top left with the status.
+start_active: true # Turn the virtual controller on immediately at start.
 update_frequency: 95 # How many times per second to report values. Best not to exceed 100.
 primary_mouse: &primary_mouse
   smoothing: 30 # Average using the last X measurements. Higher numbers increase perceived input lag.
-  swap_axes: false # Swap axes, though MSFS can map any axis to any control
+  swap_axes: false # Swap axes, though MSFS can map any axis to any control.
   absolute: false # Mice are relative, other devices can be either.
+  swap_x_for_z: # Some devices have a Z axis, so use it instead of X. Combine this and swap_axes to swap with Y.
   sensitivity:
-    x: 0.05 # If using absolute, the sensitivity should probably be 20 or more
+    x: 0.05 # If using absolute, the sensitivity should probably be 20 or more.
     y: 0.05
-secondary_mouse: *primary_mouse # This is a YAML trick to set up the secondary mouse the same as the primary
-throttle_segments: 10 # Throttle is increased by 10% (100/10). Another example: 20 -> 5% (100/20)
+secondary_mouse: *primary_mouse # This is a YAML trick to set up the secondary mouse the same as the primary.
+throttle_segments: 10 # Throttle is increased by 10% (100/10). Another example: 20 -> 5% (100/20).
 ```
 
 ## Usage
