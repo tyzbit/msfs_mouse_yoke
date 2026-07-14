@@ -33,7 +33,7 @@ it as a throttle.
 // config.json
 
 { 
-    "master_key": ",",
+    "activation_key": ",",
     "primary_mouse_sensitivity_x": 1,
     "primary_mouse_sensitivity_y": 1,
     "primary_mouse_smoothing": 40,

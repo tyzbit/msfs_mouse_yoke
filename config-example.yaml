@@ -1,0 +1,21 @@
+
+activation_key: Key.shift_r # RIGHT Shift key (near Enter)
+center_xy_axes_key: Key.alt_r # RIGHT Alt key (near period)
+display_gui: false
+start_active: true # If false, the virtual controller won't update until activated
+update_frequency: 95 # 95 updates per second or about 10ms
+primary_mouse:
+  smoothing: 30 # Delay depends on update_frequency.
+  swap_axes: true # Move mouse up -> Y axis increases
+  absolute: false # Mice don't send absolute values, but controllers might.
+  sensitivity: # Multiplier for each axis.
+    x: 1
+    y: 1
+secondary_mouse:
+  smoothing: 30
+  swap_axes: true
+  absolute: true
+  sensitivity:
+    x: 1
+    y: 1
+throttle_segments: 10 # 10%, 20%, 30% etc.  20 -> 5%, 10%, 15%, 20%

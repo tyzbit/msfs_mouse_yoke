@@ -11,18 +11,15 @@ import logging
 import signal
 import sys
 import re
-import json
+import yaml
 import time
 import tkinter as tk
 
-
-with open("./config.json") as config_file:
-    configs = json.load(config_file)
+with open("./config.yaml") as config_file:
+    config = yaml.safe_load(config_file)
 
 logging.basicConfig(filename=f"./logs/mouse_yoke.log", format="%(asctime)s - %(message)s", level='INFO')
 gamepad = vg.VX360Gamepad()
-
-mouse_precision = 32768
 
 # X1, X2, Y1, Y2, TX
 controller_values = {
@@ -37,9 +34,43 @@ controller_values = {
     'throttle_x': 0,
     'throttle_x_offset': 0
 }
-active = configs["start_active"]
-update_frequency = 100
+active = config["start_active"]
+update_frequency = config['update_frequency'] # Updates per second for controllers
 cycletime = 1/update_frequency
+
+# https://www.rawmeat.org/code/python-exponential-smoothing/
+def exponential_moving_average(period=int):
+    """ Exponential moving average. Smooths the values over the period.  Send
+    in values - at first it'll return a simple average, but as soon as it's
+    gathered 'period' values, it'll start to use the Exponential Moving
+    Averge to smooth the values.
+
+    period: int - how many values to smooth over (default=1000). """
+    multiplier = 2 / float(1 + period)
+    cumulative_value = yield None  # We are being primed
+
+    # Start by just returning the simple average until we have enough data.
+    for i in list(range(1, period + 1)):
+        cumulative_value += yield cumulative_value / float(i)
+
+    # Grab the simple average,
+    ema = cumulative_value / period
+
+    # and start calculating the exponentially smoothed average we want.
+    while True:
+        ema = (((yield ema) - ema) * multiplier) + ema
+
+def init_emas():
+    global primary_ema_x,primary_ema_y,secondary_ema_x,secondary_ema_y
+    primary_ema_x = exponential_moving_average(config['primary_mouse']['smoothing'])
+    primary_ema_y = exponential_moving_average(config['primary_mouse']['smoothing'])
+    secondary_ema_x = exponential_moving_average(config['secondary_mouse']['smoothing'])
+    secondary_ema_y = exponential_moving_average(config['secondary_mouse']['smoothing'])
+    # Prime the generators
+    next(primary_ema_x)
+    next(primary_ema_y)
+    next(secondary_ema_x)
+    next(secondary_ema_y)
 
 ##
 # Handles key input to start/stop and calibrate
@@ -47,18 +78,25 @@ cycletime = 1/update_frequency
 def onKeyRelease(key=keyboard.KeyCode):
     global active
     global controller_values
+    global primary_ema_x,primary_ema_y,secondary_ema_x,secondary_ema_y
     ov = controller_values
 
     # Alphanumeric keys get printed with single quotes
-    if str.replace(f'{key}', "'", "") == configs["master_key"]:
+    if str.replace(f'{key}', "'", "") == config["activation_key"]:
         active = not active
         logging.info(f'Active: {active}')
 
-    if str.replace(f'{key}', "'", "") == configs["center_xy_axes_key"]:
+    if str.replace(f'{key}', "'", "") == config["center_xy_axes_key"]:
         logging.info(f'Centering axes')
         gamepad.left_joystick_float(0,0)
         gamepad.right_joystick_float(0,0)
         gamepad.update()
+        for i in range(config['primary_mouse']['smoothing']):
+            primary_ema_x.send(0)
+            primary_ema_y.send(0)
+        for i in range(config['secondary_mouse']['smoothing']):
+            secondary_ema_x.send(0)
+            secondary_ema_y.send(0)
         controller_values = {
             'primary_x': 0.0,
             'primary_y': 0.0,
@@ -66,7 +104,7 @@ def onKeyRelease(key=keyboard.KeyCode):
             'primary_y_offset': ov['primary_y']+ov['primary_y_offset'],
             'secondary_x': 0.0,
             'secondary_y': 0.0,
-            'secondary_x_offset': ov['secondary_x']+ov['primary_y_offset'],
+            'secondary_x_offset': ov['secondary_x']+ov['secondary_x_offset'],
             'secondary_y_offset': ov['secondary_y']+ov['secondary_y_offset'],
             'throttle_x': 0.0,
             'throttle_x_offset': ov['throttle_x']
@@ -92,7 +130,7 @@ def userInterface():
             output_lines[5] = f"|{'Y1':^20}{'{:.2f}'.format((py + 1) * 50) + '%':^20}|"
             output_lines[6] = f"|{'X2':^20}{'{:.2f}'.format((sx + 1) * 50) + '%':^20}|"
             output_lines[7] = f"|{'Y2':^20}{'{:.2f}'.format((sy + 1) * 50) + '%':^20}|"
-            output_lines[8] = f"|{'THROTTLE':^20}{'{:.2f}'.format((tx / configs['throttle_segments']) * 100) + '%':^20}|"
+            output_lines[8] = f"|{'THROTTLE':^20}{'{:.2f}'.format((tx / config['throttle_segments']) * 100) + '%':^20}|"
             output_lines[9] = f"+{'':—^40}+"
 
             time.sleep(0.1)
@@ -132,28 +170,6 @@ class ColorDisplayApp:
         self.master.after(100, self.update_display)
 
 
-# https://www.rawmeat.org/code/python-exponential-smoothing/
-def exponential_moving_average(period=int):
-    """ Exponential moving average. Smooths the values over the period.  Send
-    in values - at first it'll return a simple average, but as soon as it's
-    gathered 'period' values, it'll start to use the Exponential Moving
-    Averge to smooth the values.
-
-    period: int - how many values to smooth over (default=1000). """
-    multiplier = 2 / float(1 + period)
-    cumulative_temp = yield None  # We are being primed
-
-    # Start by just returning the simple average until we have enough data.
-    for i in list(range(1, period + 1)):
-        cumulative_temp += yield cumulative_temp / float(i)
-
-    # Grab the simple average,
-    ema = cumulative_temp / period
-
-    # and start calculating the exponentially smoothed average we want.
-    while True:
-        ema = (((yield ema) - ema) * multiplier) + ema
-
 ##
 # Reads mouse input and updates gamepad values. The actual gamepad update happens elsewhere.
 # device_name: primary/secondary
@@ -164,8 +180,8 @@ def mouseLoop(device_name=str, device_descriptor=str, throttle=bool):
     x = f'{device_name}_x'
     y = f'{device_name}_y'
     tx = 'throttle_x'
-    sens = f'{device_name}_mouse_sensitivity'
-    global controller_values
+    global controller_values, config
+    global primary_ema_x,primary_ema_y,secondary_ema_x,secondary_ema_y
     
     while True:
         if not device_descriptor.isdigit():
@@ -185,48 +201,63 @@ def mouseLoop(device_name=str, device_descriptor=str, throttle=bool):
             continue
 
         logging.info(f'{device_name} device initialized')
-        primary_ema_x = exponential_moving_average(configs['primary_mouse_smoothing'])
-        next(primary_ema_x)  # Prime the generator
-        primary_ema_y = exponential_moving_average(configs['primary_mouse_smoothing'])
-        next(primary_ema_y)  # Prime the generator
-        secondary_ema_x = exponential_moving_average(configs['secondary_mouse_smoothing'])
-        next(secondary_ema_x)  # Prime the generator
-        secondary_ema_y = exponential_moving_average(configs['secondary_mouse_smoothing'])
-        next(secondary_ema_y)  # Prime the generator
-
-        logging.debug('Before try')
         try:
             for event in device.read_loop():
                 match event.type:
                     case evdev.ecodes.EV_REL:
-                        match event.code:
-                            case evdev.ecodes.REL_X:
-                                controller_values[x] = controller_values[x] + (event.value * configs[f'{sens}_x'] - controller_values[f'{x}_offset'])
-                            case evdev.ecodes.REL_Y:
-                                controller_values[y] = controller_values[y] + (event.value * configs[f'{sens}_y'] - controller_values[f'{x}_offset'])
-                            case evdev.ecodes.REL_WHEEL:
-                                if throttle:
-                                    controller_values[tx] = max(0, min(controller_values[tx] + event.value + controller_values[f'{tx}_offset'], configs['throttle_segments']))
-                                    # ensure between 0.0 and 1.0
-                                    gamepad.left_trigger_float(value_float=(controller_values[tx] / configs['throttle_segments']))
+                        if not config[f'{device_name}_mouse']['absolute']:
+                            match event.code:
+                                case evdev.ecodes.REL_X:
+                                    # divide by 100 so sensitivies don't need to be in the hundreds in the config
+                                    sensitivity = config[f'{device_name}_mouse']['sensitivity']['x'] / 100
+                                    controller_values[x] = controller_values[x] + (event.value * sensitivity)
+                                    # The offset for relative controllers should always be zero
+                                    controller_values['f{x}_offset'] = 0
+                                case evdev.ecodes.REL_Y:
+                                    sensitivity = config[f'{device_name}_mouse']['sensitivity']['y'] / 100
+                                    controller_values[y] = controller_values[y] + (event.value * sensitivity)
+                                    # The offset for relative controllers should always be zero
+                                    controller_values['f{y}_offset'] = 0
+                                case evdev.ecodes.REL_WHEEL:
+                                    if throttle:
+                                        controller_values[tx] = max(0, min(controller_values[tx] + event.value, config['throttle_segments']))
+                                        # ensure between 0.0 and 1.0
+                                        gamepad.left_trigger_float(value_float=(controller_values[tx] / config['throttle_segments']))
 
                     case evdev.ecodes.EV_ABS:
-                        match event.code:
-                            case evdev.ecodes.ABS_X:
-                                raw_x = (event.value * configs[f'{sens}_x'] + (mouse_precision/2)) / mouse_precision/2
-                                controller_values[x] = raw_x - 1 - controller_values[f'{x}_offset']
-                            case evdev.ecodes.ABS_Y:
-                                raw_y = (event.value * configs[f'{sens}_y'] + (mouse_precision/2)) / mouse_precision/2
-                                controller_values[y] = raw_y - 1 - controller_values[f'{y}_offset']
+                        absolute_degrees = device.absinfo(evdev.ecodes.ABS_X).max - device.absinfo(evdev.ecodes.ABS_X).min
+                        if config[f'{device_name}_mouse']['absolute']:
+                            match event.code:
+                                case evdev.ecodes.ABS_X:
+                                    # multiply by 10 so sensitivies don't need to be super tiny in the config
+                                    sensitivity = config[f'{device_name}_mouse']['sensitivity']['x'] * 10
+                                    raw_x = (event.value * sensitivity + (absolute_degrees/2)) / absolute_degrees/2
+                                    controller_values[x] = raw_x - 1 - controller_values[f'{x}_offset']
+                                case evdev.ecodes.ABS_Y:
+                                    sensitivity = config[f'{device_name}_mouse']['sensitivity']['y'] * 10
+                                    raw_y = (event.value * sensitivity + (absolute_degrees/2)) / absolute_degrees/2
+                                    controller_values[y] = raw_y - 1 - controller_values[f'{y}_offset']
+                        else:
+                            match event.code:
+                                case evdev.ecodes.ABS_RX:
+                                    sensitivity = config[f'{device_name}_mouse']['sensitivity']['x']
+                                    controller_values[x] = controller_values[x] + (event.value * sensitivity)
+                                    # The offset for relative controllers should always be zero
+                                    controller_values['f{x}_offset'] = 0
+                                case evdev.ecodes.ABS_RY:
+                                    sensitivity = config[f'{device_name}_mouse']['sensitivity']['y']
+                                    controller_values[y] = controller_values[y] + (event.value * sensitivity)
+                                    # The offset for relative controllers should always be zero
+                                    controller_values['f{y}_offset'] = 0
 
                     case evdev.ecodes.EV_KEY:
                         match event.code:
-                            case evdev.ecodes.BTN_LEFT:
+                            case evdev.ecodes.BTN_LEFT | evdev.ecodes.BTN_EAST:
                                 if event.value == 1:
                                     gamepad.press_button(vg.XUSB_BUTTON.XUSB_GAMEPAD_A)
                                 else:
                                     gamepad.release_button(vg.XUSB_BUTTON.XUSB_GAMEPAD_A)
-                            case evdev.ecodes.BTN_RIGHT:
+                            case evdev.ecodes.BTN_RIGHT | evdev.ecodes.BTN_WEST:
                                 if event.value == 1:
                                     gamepad.press_button(vg.XUSB_BUTTON.XUSB_GAMEPAD_B)
                                 else:
@@ -274,7 +305,7 @@ def gamepadloop():
 # Handles the graphical GUI for showing active status
 ##
 def runTK():
-    if(not configs['display_gui']):
+    if(not config['display_gui']):
         return
     root = tk.Tk()
     app = ColorDisplayApp(root)
@@ -282,6 +313,7 @@ def runTK():
 
 if __name__ == "__main__":
     logging.warning("mouse_yoke.py is now running\n\n")
+    init_emas()
 
     try:
         primary_device = evdev.InputDevice
