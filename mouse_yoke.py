@@ -199,6 +199,11 @@ def mouseLoop(device_name=str, device_descriptor=str, throttle=bool):
     y = f'{device_name}_y'
     if config[f'{device_name}_mouse']['swap_axes']:
         x,y = y,x
+        logging.warning('swapping axes')
+    if config[f'{device_name}_mouse']['swap_x_for_z']:
+        logging.warning('swapping X for Z')
+    if config[f'{device_name}_mouse']['absolute']:
+        logging.warning('absolute mode in use')
     tx = 'throttle_x'
     
     while True:
@@ -229,12 +234,12 @@ def mouseLoop(device_name=str, device_descriptor=str, throttle=bool):
                                     sensitivity = config[f'{device_name}_mouse']['sensitivity']['x']
                                     controller_values[x] = controller_values[x] + (event.value * sensitivity)
                                     # The offset for relative controllers should always be zero
-                                    controller_values['f{x}_offset'] = 0
+                                    controller_values[f'{x}_offset'] = 0
                                 case evdev.ecodes.REL_Y:
                                     sensitivity = config[f'{device_name}_mouse']['sensitivity']['y']
                                     controller_values[y] = controller_values[y] + (event.value * sensitivity)
                                     # The offset for relative controllers should always be zero
-                                    controller_values['f{y}_offset'] = 0
+                                    controller_values[f'{y}_offset'] = 0
                                 case evdev.ecodes.REL_WHEEL:
                                     if throttle:
                                         controller_values[tx] = max(0, min(controller_values[tx] + event.value, config['throttle_segments']))
@@ -265,12 +270,12 @@ def mouseLoop(device_name=str, device_descriptor=str, throttle=bool):
                                     sensitivity = config[f'{device_name}_mouse']['sensitivity']['x']
                                     controller_values[x] = controller_values[x] + (event.value * sensitivity)
                                     # The offset for relative controllers should always be zero
-                                    controller_values['f{x}_offset'] = 0
+                                    controller_values[f'{x}_offset'] = 0
                                 case evdev.ecodes.ABS_RY:
                                     sensitivity = config[f'{device_name}_mouse']['sensitivity']['y']
                                     controller_values[y] = controller_values[y] + (event.value * sensitivity)
                                     # The offset for relative controllers should always be zero
-                                    controller_values['f{y}_offset'] = 0
+                                    controller_values[f'{y}_offset'] = 0
 
                     case evdev.ecodes.EV_KEY:
                         match event.code:
