@@ -38,7 +38,8 @@ active = config["start_active"]
 update_frequency = config['update_frequency'] # Updates per second for controllers
 cycletime = 1/update_frequency
 calibration_file = './calibration-config.yaml'
-
+event_timestamps = []
+events_per_second = 0
 
 # https://www.rawmeat.org/code/python-exponential-smoothing/
 def exponential_moving_average(period=int):
@@ -130,7 +131,7 @@ def onKeyRelease(key=keyboard.KeyCode):
 # Draws the simple terminal interface
 ## 
 def userInterface():
-    with output(initial_len=10, interval=0) as output_lines:
+    with output(initial_len=11, interval=0) as output_lines:
         while True:
             global controller_values
             px = controller_values['primary_x']
@@ -147,7 +148,8 @@ def userInterface():
             output_lines[6] = f"|{'X2':^20}{'{:.2f}'.format((sx + 1) * 50) + '%':^20}|"
             output_lines[7] = f"|{'Y2':^20}{'{:.2f}'.format((sy + 1) * 50) + '%':^20}|"
             output_lines[8] = f"|{'THROTTLE':^20}{'{:.2f}'.format((tx / config['throttle_segments']) * 100) + '%':^20}|"
-            output_lines[9] = f"+{'':—^40}+"
+            output_lines[9] = f"|{'EVENTS PER SECOND':^20}{'{:.2f}'.format(events_per_second):^20}|"
+            output_lines[10] = f"+{'':—^40}+"
 
             time.sleep(0.1)
 
@@ -193,7 +195,7 @@ class ColorDisplayApp:
 # throttle: enable/disable use of scroll wheel for throttle
 ##
 def mouseLoop(device_name=str, device_descriptor=str, throttle=bool):
-    global controller_values, config
+    global controller_values, config, event_timestamps, events_per_second
     global primary_ema_x,primary_ema_y,secondary_ema_x,secondary_ema_y
     x = f'{device_name}_x'
     y = f'{device_name}_y'
@@ -222,7 +224,7 @@ def mouseLoop(device_name=str, device_descriptor=str, throttle=bool):
         if not device.info.vendor:
             time.sleep(1)
             continue
-
+        absolute_degrees = device.absinfo(evdev.ecodes.ABS_X).max - device.absinfo(evdev.ecodes.ABS_X).min
         logging.info(f'{device_name} device initialized')
         try:
             for event in device.read_loop():
@@ -247,7 +249,6 @@ def mouseLoop(device_name=str, device_descriptor=str, throttle=bool):
                                         gamepad.left_trigger_float(value_float=(controller_values[tx] / config['throttle_segments']))
 
                     case evdev.ecodes.EV_ABS:
-                        absolute_degrees = device.absinfo(evdev.ecodes.ABS_X).max - device.absinfo(evdev.ecodes.ABS_X).min
                         if config[f'{device_name}_mouse']['absolute']:
                             match event.code:
                                 case evdev.ecodes.ABS_X:
@@ -289,6 +290,16 @@ def mouseLoop(device_name=str, device_descriptor=str, throttle=bool):
                                     gamepad.press_button(vg.XUSB_BUTTON.XUSB_GAMEPAD_B)
                                 else:
                                     gamepad.release_button(vg.XUSB_BUTTON.XUSB_GAMEPAD_B)
+
+                event_timestamps.append(event.timestamp())
+                now = time.time()
+                events_per_second = 0
+                new_events = []
+                for ts in event_timestamps:
+                    if ts > now - 1:
+                        events_per_second += 1
+                        new_events.append(ts)
+                event_timestamps = new_events
 
                 # ensure between -1.0 and 1.0a
                 controller_values[x] = max(-1.0, min(controller_values[x], 1.0))
