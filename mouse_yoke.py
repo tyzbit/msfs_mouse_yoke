@@ -40,6 +40,9 @@ cycletime = 1/update_frequency
 calibration_file = './calibration-config.yaml'
 event_timestamps = []
 events_per_second = 0
+processing_timestamps = []
+processing_per_second = 0
+dropping = False
 
 # https://www.rawmeat.org/code/python-exponential-smoothing/
 def exponential_moving_average(period=int):
@@ -131,14 +134,15 @@ def onKeyRelease(key=keyboard.KeyCode):
 # Draws the simple terminal interface
 ## 
 def userInterface():
-    with output(initial_len=11, interval=0) as output_lines:
+    with output(initial_len=13, interval=0) as output_lines:
         while True:
-            global controller_values
+            global controller_values, dropping
             px = controller_values['primary_x']
             py = controller_values['primary_y']
             sx = controller_values['secondary_x']
             sy = controller_values['secondary_y']
             tx = controller_values['throttle_x']
+            dropping_events = "DELAYS DETECTED" if dropping else ""
             output_lines[0] = f"+{' Status: ' + ('ACTIVE' if active else 'INACTIVE') + ' ':—^40}+"
             output_lines[1] = f"|{'':^40}|"
             output_lines[2] = f"|{'Axis':^20}{'Position':^20}|"
@@ -149,7 +153,9 @@ def userInterface():
             output_lines[7] = f"|{'Y2':^20}{'{:.2f}'.format((sy + 1) * 50) + '%':^20}|"
             output_lines[8] = f"|{'THROTTLE':^20}{'{:.2f}'.format((tx / config['throttle_segments']) * 100) + '%':^20}|"
             output_lines[9] = f"|{'EVENTS PER SECOND':^20}{'{:.2f}'.format(events_per_second):^20}|"
-            output_lines[10] = f"+{'':—^40}+"
+            output_lines[10] = f"|{'PROCESSED PER SECOND':^20}{'{:.2f}'.format(processing_per_second):^20}|"
+            output_lines[10] = f"|{dropping_events:^20}{dropping_events:^20}|"
+            output_lines[12] = f"+{'':—^40}+"
 
             time.sleep(0.1)
 
@@ -195,7 +201,8 @@ class ColorDisplayApp:
 # throttle: enable/disable use of scroll wheel for throttle
 ##
 def mouseLoop(device_name=str, device_descriptor=str, throttle=bool):
-    global controller_values, config, event_timestamps, events_per_second
+    global controller_values, config
+    global event_timestamps, events_per_second, processing_timestamps, processing_per_second, dropping
     global primary_ema_x,primary_ema_y,secondary_ema_x,secondary_ema_y
     x = f'{device_name}_x'
     y = f'{device_name}_y'
@@ -228,6 +235,11 @@ def mouseLoop(device_name=str, device_descriptor=str, throttle=bool):
         logging.info(f'{device_name} device initialized')
         try:
             for event in device.read_loop():
+                if event.timestamp() < time.time() - (config['drop_delay_ms'] / 1000):
+                    dropping = True
+                    continue
+                else:
+                    dropping = False
                 match event.type:
                     case evdev.ecodes.EV_REL:
                         if not config[f'{device_name}_mouse']['absolute']:
@@ -300,6 +312,16 @@ def mouseLoop(device_name=str, device_descriptor=str, throttle=bool):
                         events_per_second += 1
                         new_events.append(ts)
                 event_timestamps = new_events
+
+                processing_timestamps.append(event.timestamp())
+                now = time.time()
+                processing_per_second = 0
+                new_processing_events = []
+                for ts in processing_timestamps:
+                    if ts > now - 1:
+                        processing_per_second += 1
+                        new_processing_events.append(ts)
+                processing_timestamps = new_processing_events
 
                 # ensure between -1.0 and 1.0a
                 controller_values[x] = max(-1.0, min(controller_values[x], 1.0))
