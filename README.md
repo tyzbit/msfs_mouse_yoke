@@ -1,23 +1,21 @@
-# msfs_mouse_yoke
+# Device Transmogrifier
 
 This was forked from https://github.com/matiaspedelhez/msfs_mouse_yoke to 
-customize a little for Linux. The work that was previously done is greatly
-appreciated.
+customize a little for Linux and was developed a bit further. The work that was
+previously done is greatly appreciated.
 
-This is a small script written in Python that lets you fly with your mouse in 
-Microsoft Flight Simulator 2020. (Why is this not implemented in the game yet?).
-It also includes a throttle axis (technically right joystick X axis) and two
-buttons (Left and Right click mapped to A and B).
-
+This script lets you take any Linux input device that emits relative or absolute
+axis values (such as a mouse, PS4 controller or Nintendo Switch joycon) and
+emulate them as a more compatible Xbox 360 controller while also allowing for
+calibration, input scaling and smoothing input values via 
 
 ## How does it work?
 
-The script is always listening for the mouse position of a device you pick and 
-it transforms that into an xbox controller input. It can do this for two mice at
-once (each mouse is the X and Y of the left or right thumbstick). It also
-listens for the scroll wheel position from the first mouse, that way you can use
-it as a throttle.
-
+The script is always listening for the inputs of a device you pick and 
+it transforms that into an xbox controller input. It can do this for two devices
+at once (each device is the X and Y of the left or right thumbstick). It also
+listens for click events and reads the scroll wheel position from the first
+mouse, that way you can use it as a throttle.
 
 ## Installation
 
@@ -31,21 +29,31 @@ it as a throttle.
 
 ```yaml
 # config.yaml
-activation_key: Key.shift_r # This turns on the virtual controller.
-center_xy_axes_key: Key.alt_r # Calibrate.
-display_gui: false # Show a small window in the top left with the status.
-start_active: true # Turn the virtual controller on immediately at start.
-update_frequency: 95 # How many times per second to report values. Best not to exceed 100.
-primary_mouse: &primary_mouse
-  smoothing: 30 # Average using the last X measurements. Higher numbers increase perceived input lag.
-  swap_axes: false # Swap axes, though MSFS can map any axis to any control.
-  absolute: false # Mice are relative, other devices can be either.
-  swap_x_for_z: # Some devices have a Z axis, so use it instead of X. Combine this and swap_axes to swap with Y.
+activation_key: Key.shift_r # RIGHT Shift key (near Enter)
+center_xy_axes_key: Key.alt_r # RIGHT Alt key (near period)
+display_gui: false
+start_active: true # If false, the virtual controller won't update until activated
+update_frequency: 95 # 95 updates per second or about 10ms
+drop_delay_ms: 500 # Drop events that have a timestamp this many ms behind now
+skip_old_events: false # If an event happens to arrive after a more recent event, drop it
+primary_mouse:
+  smoothing: 30 # Delay depends on update_frequency.
+  swap_axes: true # Move mouse up -> Y axis increases
+  swap_x_for_z: true # Use Z axis instead. To swap for Y, enable swap_axes also.
+  absolute: false # Mice don't send absolute values, but controllers might.
+  sensitivity: # Multiplier for each axis.
+    x: 1
+    y: 1
+secondary_mouse:
+  smoothing: 30
+  swap_axes: true
+  swap_x_for_z: true
+  absolute: true
   sensitivity:
-    x: 0.05 # If using absolute, the sensitivity should probably be 20 or more.
-    y: 0.05
-secondary_mouse: *primary_mouse # This is a YAML trick to set up the secondary mouse the same as the primary.
-throttle_segments: 10 # Throttle is increased by 10% (100/10). Another example: 20 -> 5% (100/20).
+    x: 1
+    y: 1
+throttle_segments: 10 # 10%, 20%, 30% etc.  20 -> 5%, 10%, 15%, 20%
+
 ```
 
 ## Usage
