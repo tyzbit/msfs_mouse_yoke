@@ -108,6 +108,14 @@ def onKeyRelease(key=keyboard.KeyCode):
         gamepad.left_joystick_float(0,0)
         gamepad.right_joystick_float(0,0)
         gamepad.update()
+
+        for i in range(config['primary_mouse']['smoothing']*2):
+            primary_ema_x.send(0)
+            primary_ema_y.send(0)
+        for i in range(config['secondary_mouse']['smoothing']*2):
+            secondary_ema_x.send(0)
+            secondary_ema_y.send(0)
+
         # Zero out controller values and save relative offsets
         controller_values = {
             'primary_x': 0.0,
