@@ -47,8 +47,8 @@ update_frequency = config['update_frequency'] # Updates per second for controlle
 cycletime = 1/update_frequency
 
 # Tr
-event_timestamps, event_dropped_timestamps, processing_timestamps = []
-events_per_second, current_events_dropped_per_second, processing_per_second = 0
+event_timestamps, event_dropped_timestamps, processing_timestamps = [],[],[]
+events_per_second, current_events_dropped_per_second, processing_per_second = 0,0,0
 greatest_timestamp = 0.0
 current_delay = 0.0
 
